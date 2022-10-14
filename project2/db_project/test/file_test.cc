@@ -17,11 +17,11 @@
  * 2. Check if the file's initial size is 10 MiB
  */
 TEST(FileInitTest, HandlesInitialization) {
-  int fd;                                 // file descriptor
+  int64_t fd;                             // file descriptor
   std::string pathname = "init_test.db";  // customize it to your test file
 
   // Open a database file
-  fd = file_open_database_file(pathname.c_str());
+  fd = file_open_table_file(pathname.c_str());
 
   // Check if the file is opened
   ASSERT_TRUE(fd >= 0);  // change the condition to your design's behavior
@@ -33,7 +33,7 @@ TEST(FileInitTest, HandlesInitialization) {
       << num_pages;
 
   // Close all database files
-  file_close_database_file();
+  file_close_table_files();
 
   // Remove the db file
   int is_removed = remove(pathname.c_str());
@@ -53,16 +53,16 @@ class FileTest : public ::testing::Test {
    */
   FileTest() {
     pathname = "file_test.db";
-    fd = file_open_database_file(pathname.c_str());
+    fd = file_open_table_file(pathname.c_str());
   }
 
   ~FileTest() {
     if (fd >= 0) {
-      file_close_database_file();
+      file_close_table_files();
     }
   }
 
-  int fd;                // file descriptor
+  int64_t fd;            // file descriptor
   std::string pathname;  // path for the file
 };
 
