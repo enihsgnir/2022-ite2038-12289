@@ -1423,11 +1423,17 @@ int db_delete_entry(int64_t table_id,
     return db_adjust_root(table_id, root);
   }
 
-  int32_t min_keys = is_leaf ? cut(order - 1) : cut(order) - 1;
-
+  int64_t amount_of_free_space = db_get_amount_of_free_space(&page);
   int32_t number_of_keys = db_get_number_of_keys(&page);
-  if (number_of_keys >= min_keys) {
-    return 0;
+
+  if (is_leaf) {
+    if (amount_of_free_space < THRESHOLD) {
+      return 0;
+    }
+  } else {
+    if (number_of_keys >= cut(order) - 1) {
+      return 0;
+    }
   }
 
   pagenum_t parent = db_get_parent_page_number(&page);
