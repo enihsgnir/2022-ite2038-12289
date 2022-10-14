@@ -1115,7 +1115,8 @@ int db_coalesce_internals(int64_t table_id,
   if (neighbor_children == NULL) {
     exit(EXIT_FAILURE);
   }
-  db_get_children(&neighbor_page, neighbor_children, neighbor_number_of_keys);
+  db_get_children(&neighbor_page, neighbor_children,
+                  neighbor_number_of_keys + 1);
 
   pagenum_t parent = db_get_parent_page_number(&internal_page);
 
