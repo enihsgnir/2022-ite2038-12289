@@ -9,14 +9,14 @@ control_block_t* tail_block;
 
 // OPERATORS.
 
-bool operator==(const page_hash_t& pi1, const page_hash_t& pi2) {
-  return pi1.table_id == pi2.table_id && pi1.page_num == pi2.page_num;
+bool operator==(const page_hash_t& p1, const page_hash_t& p2) {
+  return p1.table_id == p2.table_id && p1.page_num == p2.page_num;
 }
 
 std::size_t std::hash<page_hash_t>::operator()(
-    page_hash_t const& pi) const noexcept {
-  std::size_t h1 = std::hash<int64_t>{}(pi.table_id);
-  std::size_t h2 = std::hash<pagenum_t>{}(pi.page_num);
+    page_hash_t const& p) const noexcept {
+  std::size_t h1 = std::hash<int64_t>{}(p.table_id);
+  std::size_t h2 = std::hash<pagenum_t>{}(p.page_num);
   return h1 ^ (h2 << 1);
 }
 
@@ -141,11 +141,6 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
   if (block == NULL) {
     block = buf_find_victim();
     if (block == NULL) {
-      /* There is no victim.
-       * All control blocks are pinned.
-       */
-
-      // return new control block with negative pin count.
       block = (control_block_t*)malloc(sizeof(control_block_t));
       if (block == NULL) {
         exit(EXIT_FAILURE);
@@ -216,7 +211,6 @@ void buf_refer_block(control_block_t* block) {
     return;
   }
 
-  // delete from LRU list
   if (block == tail_block) {
     block->prev->next = NULL;
     tail_block = block->prev;
@@ -225,7 +219,6 @@ void buf_refer_block(control_block_t* block) {
     block->next->prev = block->prev;
   }
 
-  // insert block at the front of the list
   head_block->prev = block;
   block->next = head_block;
   block->prev = NULL;
@@ -240,7 +233,6 @@ void buf_make_block_empty(control_block_t* block) {
     return;
   }
 
-  // delete the freed block from LRU list
   if (block == head_block) {
     block->next->prev = NULL;
     head_block = block->next;
@@ -249,7 +241,6 @@ void buf_make_block_empty(control_block_t* block) {
     block->next->prev = block->prev;
   }
 
-  // put the freed block at the end of LRU list
   tail_block->next = block;
   block->prev = tail_block;
   block->next = NULL;
