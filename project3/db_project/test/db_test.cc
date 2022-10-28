@@ -5,7 +5,7 @@
 #include <string>
 
 TEST(DbTest, Shutdown) {
-  init_db();
+  init_db(1);
 
   std::string pathname = "db_shutdown_test.db";
   open_table(pathname.c_str());
@@ -20,7 +20,7 @@ TEST(DbTest, Shutdown) {
 }
 
 TEST(DbTest, OpenSameFile) {
-  init_db();
+  init_db(1);
 
   std::string pathname = "db_test_same.db";
 
@@ -39,7 +39,7 @@ TEST(DbTest, OpenSameFile) {
 }
 
 TEST(DbTest, TableNumberLimit) {
-  init_db();
+  init_db(1);
 
   auto pathname_at = [](int i) {
     std::string n1 = std::to_string(i / 10);
@@ -66,11 +66,14 @@ TEST(DbTest, TableNumberLimit) {
 
 class DbBasic : public ::testing::Test {
  protected:
+  int num_buf;
   std::string pathname;
   int64_t table_id;
 
   DbBasic() {
-    init_db();
+    num_buf = 1000;
+    init_db(num_buf);
+
     pathname = "db_test.db";
     table_id = open_table(pathname.c_str());
   }

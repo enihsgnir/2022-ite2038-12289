@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "buffer.h"
 #include "file.h"
 
 #define DEFAULT_ORDER (249)
@@ -53,7 +54,7 @@ int db_scan(int64_t table_id,
             std::vector<uint16_t>* val_sizes);
 
 // Initialize the database system.
-int init_db();
+int init_db(int num_buf);
 
 // Shutdown the database system.
 int shutdown_db();
