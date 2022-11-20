@@ -40,7 +40,7 @@ int db_insert(int64_t table_id,
               uint16_t val_size);
 
 // Find a record with the matching key from the given table.
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t val_size);
+int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size);
 
 // Delete a record with the matching key from the given table.
 int db_delete(int64_t table_id, int64_t key);

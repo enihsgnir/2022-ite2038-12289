@@ -23,8 +23,9 @@ int db_insert(int64_t table_id,
     return -1;
   }
 
-  char temp[MAX_VAL_SIZE];
-  if (db_find(table_id, key, temp, val_size) == 0) {
+  char temp_val[MAX_VAL_SIZE];
+  uint16_t temp_size;
+  if (db_find(table_id, key, temp_val, &temp_size) == 0) {
     return -1;
   }
 
@@ -49,7 +50,7 @@ int db_insert(int64_t table_id,
 }
 
 // Find a record with the matching key from the given table.
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t val_size) {
+int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
   control_block_t* header_block = buf_read_page(table_id, 0);
   pagenum_t root = db_get_root_page_number(header_block->frame);
   buf_unpin_block(header_block, 0);
@@ -77,7 +78,8 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t val_size) {
     return -1;
   }
 
-  db_get_value(ret_val, leaf_block->frame, val_size, slots[i].offset);
+  db_get_value(ret_val, leaf_block->frame, slots[i].size, slots[i].offset);
+  *val_size = slots[i].size;
 
   buf_unpin_block(leaf_block, 0);
 
@@ -88,8 +90,9 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t val_size) {
 
 // Delete a record with the matching key from the given table.
 int db_delete(int64_t table_id, int64_t key) {
-  char temp[MAX_VAL_SIZE];
-  int find_result = db_find(table_id, key, temp, 0);
+  char temp_val[MAX_VAL_SIZE];
+  uint16_t temp_size;
+  int find_result = db_find(table_id, key, temp_val, &temp_size);
 
   control_block_t* header_block = buf_read_page(table_id, 0);
   pagenum_t root = db_get_root_page_number(header_block->frame);

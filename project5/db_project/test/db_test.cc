@@ -110,7 +110,8 @@ TEST_F(DbBasic, IsInitialRootNull) {
 
 class DbInsertAndDelete : public DbBasic {
  protected:
-  int size;
+  uint16_t size;
+  uint16_t temp_size;
   char* expected;
   char* actual;
   char* expected_b;
@@ -152,23 +153,23 @@ class DbInsertAndDelete : public DbBasic {
 TEST_F(DbInsertAndDelete, InsertOneAndDelete) {
   ASSERT_EQ(db_insert(table_id, 1, expected, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 1, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 1, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected, size), 0);
 
-  EXPECT_NE(db_find(table_id, 2, actual, size), 0);
+  EXPECT_NE(db_find(table_id, 2, actual, &temp_size), 0);
 
   EXPECT_EQ(db_delete(table_id, 1), 0);
-  EXPECT_NE(db_find(table_id, 1, actual, size), 0);
+  EXPECT_NE(db_find(table_id, 1, actual, &temp_size), 0);
 }
 
 TEST_F(DbInsertAndDelete, InsertTwo) {
   ASSERT_EQ(db_insert(table_id, 1, expected, size), 0);
   ASSERT_EQ(db_insert(table_id, 2, expected_b, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 1, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 1, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 2, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 2, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_b, size), 0);
 }
 
@@ -190,11 +191,11 @@ TEST_F(DbInsertAndDelete, Insert64AndDelete) {
     }
   }
 
-  EXPECT_EQ(db_find(table_id, 32, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 32, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_b, size), 0);
 
   EXPECT_EQ(db_delete(table_id, 32), 0);
-  EXPECT_NE(db_find(table_id, 32, actual, size), 0);
+  EXPECT_NE(db_find(table_id, 32, actual, &temp_size), 0);
 }
 
 // 32 * (12 + 50) >= MIDDLE_OF_PAGE
@@ -209,14 +210,14 @@ TEST_F(DbInsertAndDelete, Insert65AndDelete) {
     }
   }
 
-  EXPECT_EQ(db_find(table_id, 31, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 31, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_b, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 32, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 32, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_c, size), 0);
 
   EXPECT_EQ(db_delete(table_id, 32), 0);
-  EXPECT_NE(db_find(table_id, 32, actual, size), 0);
+  EXPECT_NE(db_find(table_id, 32, actual, &temp_size), 0);
 }
 
 TEST_F(DbInsertAndDelete, InsertManyAndDelete) {
@@ -230,17 +231,17 @@ TEST_F(DbInsertAndDelete, InsertManyAndDelete) {
     }
   }
 
-  EXPECT_EQ(db_find(table_id, 256, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 256, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_b, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 512, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 512, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_c, size), 0);
 
   for (int i = 128; i < 384; i++) {
     EXPECT_EQ(db_delete(table_id, i), 0);
   }
   for (int i = 128; i < 384; i++) {
-    EXPECT_NE(db_find(table_id, i, actual, size), 0);
+    EXPECT_NE(db_find(table_id, i, actual, &temp_size), 0);
   }
 }
 
@@ -271,16 +272,16 @@ TEST_F(DbInsertAndDelete, InsertTooManyAndDelete) {
     }
   }
 
-  EXPECT_EQ(db_find(table_id, 2048, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 2048, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_b, size), 0);
 
-  EXPECT_EQ(db_find(table_id, 4096, actual, size), 0);
+  EXPECT_EQ(db_find(table_id, 4096, actual, &temp_size), 0);
   EXPECT_EQ(strncmp(actual, expected_c, size), 0);
 
   for (int i = 2048; i < 6144; i++) {
     EXPECT_EQ(db_delete(table_id, i), 0);
   }
   for (int i = 2048; i < 6144; i++) {
-    EXPECT_NE(db_find(table_id, i, actual, size), 0);
+    EXPECT_NE(db_find(table_id, i, actual, &temp_size), 0);
   }
 }
