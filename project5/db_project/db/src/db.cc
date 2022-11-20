@@ -8,9 +8,6 @@ int32_t order = DEFAULT_ORDER;
 
 // Open an existing database file or create one if not exist.
 int64_t open_table(const char* pathname) {
-  if (table_ids.size() >= 20) {
-    return -1;
-  }
   return buf_open_table_file(pathname);
 }
 

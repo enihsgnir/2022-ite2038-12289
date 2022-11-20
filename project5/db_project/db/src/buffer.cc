@@ -91,27 +91,27 @@ pagenum_t buf_alloc_page(int64_t table_id) {
     return file_alloc_page(table_id);
   }
 
-  pagenum_t free_page_number = buf_get_free_page_number(header_block->frame);
-  if (free_page_number == 0) {
+  pagenum_t first = buf_get_first_free_page_number(header_block->frame);
+  if (first == 0) {
     if (header_block->is_dirty) {
       file_write_page(table_id, 0, header_block->frame);
       header_block->is_dirty = 0;
     }
 
-    free_page_number = file_alloc_page(table_id);
+    first = file_alloc_page(table_id);
     file_read_page(table_id, 0, header_block->frame);
     buf_refer_block(header_block);
-    return free_page_number;
+    return first;
   }
 
   page_t free_page;
-  file_read_page(table_id, free_page_number, &free_page);
+  file_read_page(table_id, first, &free_page);
 
-  pagenum_t next_free_page_number = buf_get_next_free_page_number(&free_page);
-  buf_set_free_page_number(header_block->frame, next_free_page_number);
+  pagenum_t next = buf_get_next_free_page_number(&free_page);
+  buf_set_first_free_page_number(header_block->frame, next);
   header_block->is_dirty = 1;
   buf_refer_block(header_block);
-  return free_page_number;
+  return first;
 }
 
 void buf_free_page(int64_t table_id, pagenum_t page_num) {
@@ -127,12 +127,12 @@ void buf_free_page(int64_t table_id, pagenum_t page_num) {
     return;
   }
 
-  pagenum_t free_page_number = buf_get_free_page_number(header_block->frame);
-  buf_set_free_page_number(header_block->frame, page_num);
+  pagenum_t first = buf_get_first_free_page_number(header_block->frame);
+  buf_set_first_free_page_number(header_block->frame, page_num);
   header_block->is_dirty = 1;
 
   page_t free_page;
-  buf_set_next_free_page_number(&free_page, free_page_number);
+  buf_set_next_free_page_number(&free_page, first);
   file_write_page(table_id, page_num, &free_page);
 }
 
@@ -249,24 +249,22 @@ void buf_make_block_empty(control_block_t* block) {
 
 // Getter and Setter.
 
-pagenum_t buf_get_free_page_number(const page_t* header) {
-  pagenum_t free_page_number;
-  memcpy(&free_page_number, (uint8_t*)header + 8, 8);
-  return free_page_number;
+pagenum_t buf_get_first_free_page_number(const page_t* header) {
+  pagenum_t first;
+  memcpy(&first, (uint8_t*)header + 8, 8);
+  return first;
 }
 
-void buf_set_free_page_number(page_t* header,
-                              const pagenum_t free_page_number) {
-  memcpy((uint8_t*)header + 8, &free_page_number, 8);
+void buf_set_first_free_page_number(page_t* header, const pagenum_t first) {
+  memcpy((uint8_t*)header + 8, &first, 8);
 }
 
 pagenum_t buf_get_next_free_page_number(const page_t* page) {
-  pagenum_t next_free_page_number;
-  memcpy(&next_free_page_number, page, 8);
-  return next_free_page_number;
+  pagenum_t next;
+  memcpy(&next, page, 8);
+  return next;
 }
 
-void buf_set_next_free_page_number(page_t* page,
-                                   const pagenum_t next_free_page_number) {
-  memcpy(page, &next_free_page_number, 8);
+void buf_set_next_free_page_number(page_t* page, const pagenum_t next) {
+  memcpy(page, &next, 8);
 }

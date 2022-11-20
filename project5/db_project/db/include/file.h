@@ -11,6 +11,10 @@
 #define INITIAL_DB_FILE_SIZE (10 * 1024 * 1024)  // 10 MiB
 #define PAGE_SIZE (4 * 1024)                     // 4 KiB
 
+#define MAX_NUM_TABLE (20)
+#define DEFAULT_FILE_MODE (00644)
+#define MAGIC_NUM (2022)
+
 typedef uint64_t pagenum_t;
 
 struct page_t {
@@ -39,5 +43,20 @@ void file_write_page(int64_t table_id,
 
 // Close the database file
 void file_close_table_files();
+
+int64_t file_read_magic_number(int64_t table_id);
+void file_write_magic_number(int64_t table_id, const int64_t magic_number);
+
+pagenum_t file_read_first_free_page_number(int64_t table_id);
+void file_write_first_free_page_number(int64_t table_id, const pagenum_t first);
+
+uint64_t file_read_number_of_pages(int64_t table_id);
+void file_write_number_of_pages(int64_t table_id,
+                                const uint64_t number_of_pages);
+
+pagenum_t file_read_next_free_page_number(int64_t table_id, uint64_t index);
+void file_write_next_free_page_number(int64_t table_id,
+                                      const pagenum_t next,
+                                      uint64_t index);
 
 #endif  // DB_FILE_H_
