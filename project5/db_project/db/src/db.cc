@@ -16,7 +16,7 @@ int db_insert(int64_t table_id,
               int64_t key,
               const char* value,
               uint16_t val_size) {
-  if (val_size < 50 || val_size > 112) {
+  if (val_size < MIN_VAL_SIZE || val_size > MAX_VAL_SIZE) {
     return -1;
   }
 
@@ -59,10 +59,7 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
 
   control_block_t* leaf_block = buf_read_page(table_id, leaf);
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
   int32_t i;
@@ -80,7 +77,7 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
 
   buf_unpin_block(leaf_block, 0);
 
-  free(slots);
+  delete[] slots;
 
   return 0;
 }
@@ -121,10 +118,7 @@ int db_scan(int64_t table_id,
 
   control_block_t* block = buf_read_page(table_id, page_number);
   int32_t number_of_keys = db_get_number_of_keys(block->frame);
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(block->frame, slots, number_of_keys);
 
   int32_t i = 0, j = 0;
@@ -141,10 +135,7 @@ int db_scan(int64_t table_id,
       keys->push_back(slots[i].key);
       val_sizes->push_back(size);
 
-      char* value = (char*)malloc(sizeof(char) * size);
-      if (value == NULL) {
-        exit(EXIT_FAILURE);
-      }
+      char* value = new char[size];
       db_get_value(value, block->frame, size, slots[i].offset);
       values->push_back(value);
     }
@@ -153,18 +144,15 @@ int db_scan(int64_t table_id,
     buf_unpin_block(block, 0);
     block = buf_read_page(table_id, page_number);
     number_of_keys = db_get_number_of_keys(block->frame);
-    free(slots);
-    slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-    if (slots == NULL) {
-      exit(EXIT_FAILURE);
-    }
+    delete[] slots;
+    slots = new slot_t[number_of_keys];
     db_get_slots(block->frame, slots, number_of_keys);
     i = 0;
   }
 
   buf_unpin_block(block, 0);
 
-  free(slots);
+  delete[] slots;
 
   return 0;
 }
@@ -314,10 +302,7 @@ void db_get_values(const page_t* leaf,
     uint16_t size = slots[i].size;
     uint16_t offset = slots[i].offset;
 
-    values[i] = (char*)malloc(sizeof(char*) * size);
-    if (values[i] == NULL) {
-      exit(EXIT_FAILURE);
-    }
+    values[i] = new char[size];
     db_get_value(values[i], leaf, size, offset);
   }
 }
@@ -509,10 +494,7 @@ int db_insert_into_leaf(int64_t table_id,
   slot_t new_slot = db_make_slot(key, val_size, offset);
 
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * (number_of_keys + 1));
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys + 1];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
   int32_t insertion_point = 0;
@@ -533,7 +515,7 @@ int db_insert_into_leaf(int64_t table_id,
 
   buf_unpin_block(leaf_block, 1);
 
-  free(slots);
+  delete[] slots;
 
   return 0;
 }
@@ -546,27 +528,15 @@ int db_insert_into_leaf_after_splitting(int64_t table_id,
   control_block_t* leaf_block = buf_read_page(table_id, leaf);
 
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
-  char** values = (char**)malloc(sizeof(char*) * number_of_keys);
-  if (values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** values = new char*[number_of_keys];
   db_get_values(leaf_block->frame, slots, values, number_of_keys);
 
-  slot_t* temp_slots = (slot_t*)malloc(sizeof(slot_t) * (number_of_keys + 1));
-  if (temp_slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* temp_slots = new slot_t[number_of_keys + 1];
 
-  char** temp_values = (char**)malloc(sizeof(char*) * (number_of_keys + 1));
-  if (temp_values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** temp_values = new char*[number_of_keys + 1];
 
   int32_t insertion_index = 0;
   while (insertion_index < number_of_keys && slots[insertion_index].key < key) {
@@ -612,13 +582,13 @@ int db_insert_into_leaf_after_splitting(int64_t table_id,
   buf_unpin_block(leaf_block, 1);
   buf_unpin_block(new_leaf_block, 1);
 
-  free(slots);
+  delete[] slots;
   for (int32_t i = 0; i < split_index; i++) {
-    free(values[i]);
+    delete[] values[i];
   }
-  free(values);
-  free(temp_slots);
-  free(temp_values);
+  delete[] values;
+  delete[] temp_slots;
+  delete[] temp_values;
 
   return db_insert_into_parent(table_id, leaf, new_key, new_leaf);
 }
@@ -632,16 +602,9 @@ int db_insert_into_internal(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(parent_block->frame);
 
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (number_of_keys + 2));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[number_of_keys + 2];
   db_get_children(parent_block->frame, children, number_of_keys + 1);
-  int64_t* keys = (int64_t*)malloc(sizeof(int64_t) * (number_of_keys + 1));
-  if (keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* keys = new int64_t[number_of_keys + 1];
   db_get_keys(parent_block->frame, keys, number_of_keys);
 
   for (int32_t i = number_of_keys; i > left_index; i--) {
@@ -662,8 +625,8 @@ int db_insert_into_internal(int64_t table_id,
 
   buf_unpin_block(parent_block, 1);
 
-  free(children);
-  free(keys);
+  delete[] children;
+  delete[] keys;
 
   return 0;
 }
@@ -673,16 +636,9 @@ int db_insert_into_internal_after_splitting(int64_t table_id,
                                             int32_t left_index,
                                             int64_t key,
                                             pagenum_t right) {
-  pagenum_t* temp_children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (order + 1));
-  if (temp_children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* temp_children = new pagenum_t[order + 1];
 
-  int64_t* temp_keys = (int64_t*)malloc(sizeof(int64_t) * order);
-  if (temp_keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* temp_keys = new int64_t[order];
 
   control_block_t* old_internal_block = buf_read_page(table_id, old_internal);
 
@@ -739,8 +695,8 @@ int db_insert_into_internal_after_splitting(int64_t table_id,
   buf_unpin_block(old_internal_block, 1);
   buf_unpin_block(new_internal_block, 1);
 
-  free(temp_children);
-  free(temp_keys);
+  delete[] temp_children;
+  delete[] temp_keys;
 
   return db_insert_into_parent(table_id, old_internal, k_prime, new_internal);
 }
@@ -832,10 +788,7 @@ int db_start_new_tree(int64_t table_id,
 uint16_t db_get_total_data_size(const page_t* leaf_page) {
   int32_t number_of_keys = db_get_number_of_keys(leaf_page);
 
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(leaf_page, slots, number_of_keys);
 
   uint16_t total_size = 0;
@@ -843,7 +796,7 @@ uint16_t db_get_total_data_size(const page_t* leaf_page) {
     total_size += 12 + slots[i].size;
   }
 
-  free(slots);
+  delete[] slots;
 
   return total_size;
 }
@@ -855,11 +808,7 @@ int32_t db_get_neighbor_index(int64_t table_id, pagenum_t page_number) {
   control_block_t* parent_block = buf_read_page(table_id, parent);
 
   int32_t number_of_keys = db_get_number_of_keys(parent_block->frame);
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (number_of_keys + 1));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[number_of_keys + 1];
   db_get_children(parent_block->frame, children, number_of_keys + 1);
 
   buf_unpin_block(block, 0);
@@ -879,16 +828,10 @@ void db_remove_entry_from_leaf(int64_t table_id, pagenum_t leaf, int64_t key) {
 
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
 
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
-  char** values = (char**)malloc(sizeof(char*) * number_of_keys);
-  if (values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** values = new char*[number_of_keys];
   db_get_values(leaf_block->frame, slots, values, number_of_keys);
 
   int32_t i = 0;
@@ -904,11 +847,11 @@ void db_remove_entry_from_leaf(int64_t table_id, pagenum_t leaf, int64_t key) {
 
   buf_unpin_block(leaf_block, 1);
 
-  free(slots);
+  delete[] slots;
   for (int32_t i = 0; i < number_of_keys - 1; i++) {
-    free(values[i]);
+    delete[] values[i];
   }
-  free(values);
+  delete[] values;
 }
 
 void db_remove_entry_from_internal(int64_t table_id,
@@ -918,17 +861,10 @@ void db_remove_entry_from_internal(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(internal_block->frame);
 
-  int64_t* keys = (int64_t*)malloc(sizeof(int64_t) * number_of_keys);
-  if (keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* keys = new int64_t[number_of_keys];
   db_get_keys(internal_block->frame, keys, number_of_keys);
 
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (number_of_keys + 1));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[number_of_keys + 1];
   db_get_children(internal_block->frame, children, number_of_keys + 1);
 
   int32_t i = 0;
@@ -945,8 +881,8 @@ void db_remove_entry_from_internal(int64_t table_id,
 
   buf_unpin_block(internal_block, 1);
 
-  free(keys);
-  free(children);
+  delete[] keys;
+  delete[] children;
 }
 
 int db_adjust_root(int64_t table_id, pagenum_t root) {
@@ -993,16 +929,10 @@ int db_coalesce_leafs(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
 
-  slot_t* slots = (slot_t*)malloc(sizeof(slot_t) * number_of_keys);
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
-  char** values = (char**)malloc(sizeof(char*) * number_of_keys);
-  if (values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** values = new char*[number_of_keys];
   db_get_values(leaf_block->frame, slots, values, number_of_keys);
 
   control_block_t* neighbor_block = buf_read_page(table_id, neighbor);
@@ -1010,18 +940,10 @@ int db_coalesce_leafs(int64_t table_id,
   int32_t neighbor_number_of_keys =
       db_get_number_of_keys(neighbor_block->frame);
 
-  slot_t* neighbor_slots = (slot_t*)malloc(
-      sizeof(slot_t) * (neighbor_number_of_keys + number_of_keys));
-  if (neighbor_slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* neighbor_slots = new slot_t[neighbor_number_of_keys + number_of_keys];
   db_get_slots(neighbor_block->frame, neighbor_slots, neighbor_number_of_keys);
 
-  char** neighbor_values = (char**)malloc(
-      sizeof(char*) * (neighbor_number_of_keys + number_of_keys));
-  if (neighbor_values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** neighbor_values = new char*[neighbor_number_of_keys + number_of_keys];
   db_get_values(neighbor_block->frame, neighbor_slots, neighbor_values,
                 neighbor_number_of_keys);
 
@@ -1046,13 +968,13 @@ int db_coalesce_leafs(int64_t table_id,
 
   buf_free_page(table_id, leaf);
 
-  free(slots);
-  free(values);
-  free(neighbor_slots);
+  delete[] slots;
+  delete[] values;
+  delete[] neighbor_slots;
   for (i = 0; i < neighbor_number_of_keys + number_of_keys; i++) {
-    free(neighbor_values[i]);
+    delete[] neighbor_values[i];
   }
-  free(neighbor_values);
+  delete[] neighbor_values;
 
   return db_delete_entry(table_id, root, parent, k_prime);
 }
@@ -1073,17 +995,10 @@ int db_coalesce_internals(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(internal_block->frame);
 
-  int64_t* keys = (int64_t*)malloc(sizeof(int64_t) * number_of_keys);
-  if (keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* keys = new int64_t[number_of_keys];
   db_get_keys(internal_block->frame, keys, number_of_keys);
 
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (number_of_keys + 1));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[number_of_keys + 1];
   db_get_children(internal_block->frame, children, number_of_keys + 1);
 
   control_block_t* neighbor_block = buf_read_page(table_id, neighbor);
@@ -1091,18 +1006,12 @@ int db_coalesce_internals(int64_t table_id,
   int32_t neighbor_number_of_keys =
       db_get_number_of_keys(neighbor_block->frame);
 
-  int64_t* neighbor_keys = (int64_t*)malloc(
-      sizeof(int64_t) * (neighbor_number_of_keys + number_of_keys + 1));
-  if (neighbor_keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* neighbor_keys =
+      new int64_t[neighbor_number_of_keys + number_of_keys + 1];
   db_get_keys(neighbor_block->frame, neighbor_keys, neighbor_number_of_keys);
 
-  pagenum_t* neighbor_children = (pagenum_t*)malloc(
-      sizeof(pagenum_t) * (neighbor_number_of_keys + number_of_keys + 2));
-  if (neighbor_children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* neighbor_children =
+      new pagenum_t[neighbor_number_of_keys + number_of_keys + 2];
   db_get_children(neighbor_block->frame, neighbor_children,
                   neighbor_number_of_keys + 1);
 
@@ -1139,10 +1048,10 @@ int db_coalesce_internals(int64_t table_id,
 
   buf_free_page(table_id, internal);
 
-  free(keys);
-  free(children);
-  free(neighbor_keys);
-  free(neighbor_children);
+  delete[] keys;
+  delete[] children;
+  delete[] neighbor_keys;
+  delete[] neighbor_children;
 
   return db_delete_entry(table_id, root, parent, k_prime);
 }
@@ -1160,18 +1069,10 @@ int db_redistribute_leafs(int64_t table_id,
   int32_t neighbor_number_of_keys =
       db_get_number_of_keys(neighbor_block->frame);
 
-  slot_t* neighbor_slots =
-      (slot_t*)malloc(sizeof(slot_t) * neighbor_number_of_keys);
-  if (neighbor_slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* neighbor_slots = new slot_t[neighbor_number_of_keys];
   db_get_slots(neighbor_block->frame, neighbor_slots, neighbor_number_of_keys);
 
-  char** neighbor_values =
-      (char**)malloc(sizeof(char*) * neighbor_number_of_keys);
-  if (neighbor_values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** neighbor_values = new char*[neighbor_number_of_keys];
   db_get_values(neighbor_block->frame, neighbor_slots, neighbor_values,
                 neighbor_number_of_keys);
 
@@ -1204,17 +1105,10 @@ int db_redistribute_leafs(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(leaf_block->frame);
 
-  slot_t* slots =
-      (slot_t*)malloc(sizeof(slot_t) * (number_of_keys + num_split));
-  if (slots == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  slot_t* slots = new slot_t[number_of_keys + num_split];
   db_get_slots(leaf_block->frame, slots, number_of_keys);
 
-  char** values = (char**)malloc(sizeof(char*) * (number_of_keys + num_split));
-  if (values == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  char** values = new char*[number_of_keys + num_split];
   db_get_values(leaf_block->frame, slots, values, number_of_keys);
 
   pagenum_t parent = db_get_parent_page_number(leaf_block->frame);
@@ -1222,11 +1116,7 @@ int db_redistribute_leafs(int64_t table_id,
 
   int32_t parent_number_of_keys = db_get_number_of_keys(parent_block->frame);
 
-  int64_t* parent_keys =
-      (int64_t*)malloc(sizeof(int64_t) * parent_number_of_keys);
-  if (parent_keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* parent_keys = new int64_t[parent_number_of_keys];
   db_get_keys(parent_block->frame, parent_keys, parent_number_of_keys);
 
   int32_t i;
@@ -1263,17 +1153,17 @@ int db_redistribute_leafs(int64_t table_id,
   buf_unpin_block(neighbor_block, 1);
   buf_unpin_block(parent_block, 1);
 
-  free(slots);
+  delete[] slots;
   for (i = 0; i < number_of_keys + num_split; i++) {
-    free(values[i]);
+    delete[] values[i];
   }
-  free(values);
-  free(neighbor_slots);
+  delete[] values;
+  delete[] neighbor_slots;
   for (i = 0; i < neighbor_number_of_keys - num_split; i++) {
-    free(neighbor_values[i]);
+    delete[] neighbor_values[i];
   }
-  free(neighbor_values);
-  free(parent_keys);
+  delete[] neighbor_values;
+  delete[] parent_keys;
 
   return 0;
 }
@@ -1288,17 +1178,10 @@ int db_redistribute_internals(int64_t table_id,
 
   int32_t number_of_keys = db_get_number_of_keys(internal_block->frame);
 
-  int64_t* keys = (int64_t*)malloc(sizeof(int64_t) * (number_of_keys + 1));
-  if (keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* keys = new int64_t[number_of_keys + 1];
   db_get_keys(internal_block->frame, keys, number_of_keys + 1);
 
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (number_of_keys + 2));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[number_of_keys + 2];
   db_get_children(internal_block->frame, children, number_of_keys + 2);
 
   control_block_t* neighbor_block = buf_read_page(table_id, neighbor);
@@ -1306,18 +1189,10 @@ int db_redistribute_internals(int64_t table_id,
   int32_t neighbor_number_of_keys =
       db_get_number_of_keys(neighbor_block->frame);
 
-  int64_t* neighbor_keys =
-      (int64_t*)malloc(sizeof(int64_t) * neighbor_number_of_keys);
-  if (neighbor_keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* neighbor_keys = new int64_t[neighbor_number_of_keys];
   db_get_keys(neighbor_block->frame, neighbor_keys, neighbor_number_of_keys);
 
-  pagenum_t* neighbor_children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (neighbor_number_of_keys + 1));
-  if (neighbor_children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* neighbor_children = new pagenum_t[neighbor_number_of_keys + 1];
   db_get_children(neighbor_block->frame, neighbor_children,
                   neighbor_number_of_keys + 1);
 
@@ -1326,11 +1201,7 @@ int db_redistribute_internals(int64_t table_id,
 
   int32_t parent_number_of_keys = db_get_number_of_keys(parent_block->frame);
 
-  int64_t* parent_keys =
-      (int64_t*)malloc(sizeof(int64_t) * parent_number_of_keys);
-  if (parent_keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* parent_keys = new int64_t[parent_number_of_keys];
   db_get_keys(parent_block->frame, parent_keys, parent_number_of_keys);
 
   int32_t i;
@@ -1379,11 +1250,11 @@ int db_redistribute_internals(int64_t table_id,
   buf_unpin_block(neighbor_block, 1);
   buf_unpin_block(parent_block, 1);
 
-  free(keys);
-  free(children);
-  free(neighbor_keys);
-  free(neighbor_children);
-  free(parent_keys);
+  delete[] keys;
+  delete[] children;
+  delete[] neighbor_keys;
+  delete[] neighbor_children;
+  delete[] parent_keys;
 
   return 0;
 }
@@ -1429,17 +1300,10 @@ int db_delete_entry(int64_t table_id,
 
   int32_t parent_number_of_keys = db_get_number_of_keys(parent_block->frame);
 
-  int64_t* keys = (int64_t*)malloc(sizeof(int64_t) * parent_number_of_keys);
-  if (keys == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  int64_t* keys = new int64_t[parent_number_of_keys];
   db_get_keys(parent_block->frame, keys, parent_number_of_keys);
 
-  pagenum_t* children =
-      (pagenum_t*)malloc(sizeof(pagenum_t) * (parent_number_of_keys + 1));
-  if (children == NULL) {
-    exit(EXIT_FAILURE);
-  }
+  pagenum_t* children = new pagenum_t[parent_number_of_keys + 1];
   db_get_children(parent_block->frame, children, parent_number_of_keys + 1);
 
   int32_t neighbor_index = db_get_neighbor_index(table_id, page_number);
@@ -1461,8 +1325,8 @@ int db_delete_entry(int64_t table_id,
   buf_unpin_block(parent_block, 0);
   buf_unpin_block(neighbor_block, 0);
 
-  free(keys);
-  free(children);
+  delete[] keys;
+  delete[] children;
 
   if (is_leaf && neighbor_amount_of_free_space >= total_size) {
     return db_coalesce_leafs(table_id, root, page_number, neighbor,

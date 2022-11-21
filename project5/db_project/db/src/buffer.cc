@@ -2,7 +2,7 @@
 
 // GLOBALS.
 
-std::unordered_map<page_hash_t, control_block_t*> control_block_hash_table;
+std::unordered_map<page_hash_t, control_block_t*> control_block_table;
 
 control_block_t* head_block;
 control_block_t* tail_block;
@@ -33,21 +33,15 @@ int buf_init_db(int num_buf) {
     return -1;
   }
 
-  head_block = (control_block_t*)malloc(sizeof(control_block_t));
-  head_block->frame = (page_t*)malloc(sizeof(page_t));
+  head_block = new control_block_t;
+  head_block->frame = new page_t;
   head_block->prev = NULL;
 
   control_block_t* temp = head_block;
   for (int i = 1; i < num_buf; i++) {
-    control_block_t* block = (control_block_t*)malloc(sizeof(control_block_t));
-    if (block == NULL) {
-      exit(EXIT_FAILURE);
-    }
+    control_block_t* block = new control_block_t;
 
-    block->frame = (page_t*)malloc(sizeof(page_t));
-    if (block->frame == NULL) {
-      exit(EXIT_FAILURE);
-    }
+    block->frame = new page_t;
 
     block->table_id = 0;
     block->page_num = 0;
@@ -66,7 +60,7 @@ int buf_init_db(int num_buf) {
 }
 
 int buf_shutdown_db() {
-  control_block_hash_table.clear();
+  control_block_table.clear();
 
   control_block_t* temp = head_block;
   while (temp != NULL) {
@@ -75,8 +69,8 @@ int buf_shutdown_db() {
     }
 
     control_block_t* next = temp->next;
-    free(temp->frame);
-    free(temp);
+    delete temp->frame;
+    delete temp;
     temp = next;
   }
 
@@ -117,7 +111,7 @@ pagenum_t buf_alloc_page(int64_t table_id) {
 void buf_free_page(int64_t table_id, pagenum_t page_num) {
   control_block_t* block = buf_find_block(table_id, page_num);
   if (block != NULL) {
-    control_block_hash_table.erase({table_id, page_num});
+    control_block_table.erase({table_id, page_num});
     buf_make_block_empty(block);
   }
 
@@ -141,15 +135,9 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
   if (block == NULL) {
     block = buf_find_victim();
     if (block == NULL) {
-      block = (control_block_t*)malloc(sizeof(control_block_t));
-      if (block == NULL) {
-        exit(EXIT_FAILURE);
-      }
+      block = new control_block_t;
 
-      block->frame = (page_t*)malloc(sizeof(page_t));
-      if (block->frame == NULL) {
-        exit(EXIT_FAILURE);
-      }
+      block->frame = new page_t;
       file_read_page(table_id, page_num, block->frame);
 
       block->table_id = table_id;
@@ -165,11 +153,11 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
       block->is_dirty = 0;
     }
 
-    control_block_hash_table.erase({block->table_id, block->page_num});
+    control_block_table.erase({block->table_id, block->page_num});
     file_read_page(table_id, page_num, block->frame);
     block->table_id = table_id;
     block->page_num = page_num;
-    control_block_hash_table[{table_id, page_num}] = block;
+    control_block_table[{table_id, page_num}] = block;
   }
 
   block->is_pinned++;
@@ -180,8 +168,8 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
 void buf_unpin_block(control_block_t* block, int is_dirty) {
   if (is_dirty && block->is_pinned < 0) {
     file_write_page(block->table_id, block->page_num, block->frame);
-    free(block->frame);
-    free(block);
+    delete block->frame;
+    delete block;
     return;
   }
 
@@ -192,7 +180,7 @@ void buf_unpin_block(control_block_t* block, int is_dirty) {
 // Utility.
 
 control_block_t* buf_find_block(int64_t table_id, pagenum_t page_num) {
-  return control_block_hash_table[{table_id, page_num}];
+  return control_block_table[{table_id, page_num}];
 }
 
 control_block_t* buf_find_victim() {

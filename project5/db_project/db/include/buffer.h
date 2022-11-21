@@ -1,7 +1,6 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
-#include <stdlib.h>
 #include <string.h>
 #include <unordered_map>
 
@@ -26,19 +25,18 @@ struct page_hash_t {
 
 // GLOBALS.
 
-extern std::unordered_map<page_hash_t, control_block_t*>
-    control_block_hash_table;
+extern std::unordered_map<page_hash_t, control_block_t*> control_block_table;
 
 extern control_block_t* head_block;
 extern control_block_t* tail_block;
 
 // OPERATORS.
 
-bool operator==(const page_hash_t& pi1, const page_hash_t& pi2);
+bool operator==(const page_hash_t& p1, const page_hash_t& p2);
 
 template <>
 struct std::hash<page_hash_t> {
-  std::size_t operator()(page_hash_t const& pi) const noexcept;
+  std::size_t operator()(page_hash_t const& p) const noexcept;
 };
 
 // FUNCTION PROTOTYPES.

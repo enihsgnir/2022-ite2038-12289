@@ -1,16 +1,12 @@
 #ifndef DB_H_
 #define DB_H_
 
-#include <stdlib.h>
-#include <string.h>
-#include <cstdint>
-#include <vector>
-
 #include "buffer.h"
 #include "file.h"
 
 #define DEFAULT_ORDER (249)
 #define MIDDLE_OF_PAGE (1984)
+#define MIN_VAL_SIZE (50)
 #define MAX_VAL_SIZE (112)
 #define THRESHOLD (2500)
 
