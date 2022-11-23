@@ -2,12 +2,11 @@
 #define DB_H_
 
 #include "buffer.h"
-#include "file.h"
 
 #define DEFAULT_ORDER (249)
-#define MIDDLE_OF_PAGE (1984)
 #define MIN_VAL_SIZE (50)
 #define MAX_VAL_SIZE (112)
+#define MIDDLE_OF_PAGE (1984)
 #define THRESHOLD (2500)
 
 // TYPES.
@@ -76,18 +75,16 @@ int32_t db_get_is_leaf(const page_t* page);
 void db_set_is_leaf(page_t* page, const int32_t is_leaf);
 
 int32_t db_get_number_of_keys(const page_t* page);
-void db_set_number_of_keys(page_t* page, const int32_t number_of_keys);
+void db_set_number_of_keys(page_t* page, const int32_t num_keys);
 
 int64_t db_get_amount_of_free_space(const page_t* page);
-void db_set_amount_of_free_space(page_t* page,
-                                 const int64_t amount_of_free_space);
+void db_set_amount_of_free_space(page_t* page, const int64_t free_space);
 
 // Leaf Page.
 
 pagenum_t db_get_right_sibling_page_number(const page_t* leaf);
-void db_set_right_sibling_page_number(
-    page_t* leaf,
-    const pagenum_t right_sibling_page_number);
+void db_set_right_sibling_page_number(page_t* leaf,
+                                      const pagenum_t right_sibling);
 
 slot_t db_get_slot(const page_t* leaf, int32_t index);
 void db_set_slot(page_t* leaf, const slot_t slot, int32_t index);
@@ -140,9 +137,6 @@ int32_t cut(int32_t length);
 
 // Insertion.
 
-uint16_t db_get_next_offset(int64_t table_id,
-                            pagenum_t leaf,
-                            uint16_t val_size);
 slot_t db_make_slot(int64_t key, uint16_t val_size, uint16_t offset);
 pagenum_t db_make_page(int64_t table_id);
 pagenum_t db_make_leaf(int64_t table_id);
@@ -163,7 +157,7 @@ int db_insert_into_internal(int64_t table_id,
                             int64_t key,
                             pagenum_t right);
 int db_insert_into_internal_after_splitting(int64_t table_id,
-                                            pagenum_t old_internal,
+                                            pagenum_t internal,
                                             int32_t left_index,
                                             int64_t key,
                                             pagenum_t right);
@@ -182,7 +176,7 @@ int db_start_new_tree(int64_t table_id,
 
 // Deletion.
 
-int32_t db_get_neighbor_index(int64_t table_id, pagenum_t page_number);
+int32_t db_get_neighbor_index(int64_t table_id, pagenum_t page_num);
 void db_remove_entry_from_leaf(int64_t table_id, pagenum_t leaf, int64_t key);
 void db_remove_entry_from_internal(int64_t table_id,
                                    pagenum_t internal,
@@ -193,7 +187,7 @@ int db_coalesce_leafs(int64_t table_id,
                       pagenum_t leaf,
                       pagenum_t neighbor,
                       int32_t neighbor_index,
-                      int64_t k_prime);
+                      int64_t key);
 int db_coalesce_internals(int64_t table_id,
                           pagenum_t root,
                           pagenum_t internal,
@@ -214,7 +208,7 @@ int db_redistribute_internals(int64_t table_id,
                               int64_t k_prime);
 int db_delete_entry(int64_t table_id,
                     pagenum_t root,
-                    pagenum_t page_number,
+                    pagenum_t page_num,
                     int64_t key);
 
 #endif  // DB_H_
