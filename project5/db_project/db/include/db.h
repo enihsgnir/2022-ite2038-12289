@@ -1,7 +1,7 @@
 #ifndef DB_H_
 #define DB_H_
 
-#include "buffer.h"
+#include "trx.h"
 
 #define DEFAULT_ORDER (249)
 #define MIN_VAL_SIZE (50)
@@ -35,7 +35,11 @@ int db_insert(int64_t table_id,
               uint16_t val_size);
 
 // Find a record with the matching key from the given table.
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size);
+int db_find(int64_t table_id,
+            int64_t key,
+            char* ret_val,
+            uint16_t* val_size,
+            int trx_id = 0);
 
 // Delete a record with the matching key from the given table.
 int db_delete(int64_t table_id, int64_t key);
@@ -53,6 +57,13 @@ int init_db(int num_buf);
 
 // Shutdown the database system.
 int shutdown_db();
+
+int db_update(int64_t table_id,
+              int64_t key,
+              char* value,
+              uint16_t new_val_size,
+              uint16_t* old_val_size,
+              int trx_id);
 
 // Getters and setters.
 

@@ -20,9 +20,7 @@ int db_insert(int64_t table_id,
     return -1;
   }
 
-  char temp_val[MAX_VAL_SIZE];
-  uint16_t temp_size;
-  if (db_find(table_id, key, temp_val, &temp_size) == 0) {
+  if (db_find(table_id, key, NULL, NULL) == 0) {
     return -1;
   }
 
@@ -47,7 +45,11 @@ int db_insert(int64_t table_id,
 }
 
 // Find a record with the matching key from the given table.
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
+int db_find(int64_t table_id,
+            int64_t key,
+            char* ret_val,
+            uint16_t* val_size,
+            int trx_id) {
   control_block_t* header_block = buf_read_page(table_id, 0);
   pagenum_t root = db_get_root_page_number(header_block->frame);
   buf_unpin_block(header_block, 0);
@@ -55,6 +57,14 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
   pagenum_t leaf = db_find_leaf(table_id, root, key);
   if (leaf == 0) {
     return -1;
+  }
+
+  if (trx_id > 0) {
+    lock_t* lock = lock_acquire(table_id, leaf, key, trx_id, SHARED);
+    if (lock == NULL) {
+      trx_abort(trx_id);
+      return -1;
+    }
   }
 
   control_block_t* leaf_block = buf_read_page(table_id, leaf);
@@ -74,8 +84,12 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
     return -1;
   }
 
-  db_get_value(ret_val, leaf_block->frame, slots[i].size, slots[i].offset);
-  *val_size = slots[i].size;
+  if (ret_val != NULL) {
+    db_get_value(ret_val, leaf_block->frame, slots[i].size, slots[i].offset);
+  }
+  if (val_size != NULL) {
+    *val_size = slots[i].size;
+  }
 
   buf_unpin_block(leaf_block, 0);
 
@@ -86,9 +100,7 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
 
 // Delete a record with the matching key from the given table.
 int db_delete(int64_t table_id, int64_t key) {
-  char temp_val[MAX_VAL_SIZE];
-  uint16_t temp_size;
-  if (db_find(table_id, key, temp_val, &temp_size) != 0) {
+  if (db_find(table_id, key, NULL, NULL) != 0) {
     return -1;
   }
 
@@ -149,14 +161,14 @@ int db_scan(int64_t table_id,
     }
 
     page_num = db_get_right_sibling_page_number(block->frame);
-    buf_unpin_block(block, 0);
-    delete[] slots;
     if (page_num == 0) {
-      return 0;
+      break;
     }
 
+    buf_unpin_block(block, 0);
     block = buf_read_page(table_id, page_num);
     num_keys = db_get_number_of_keys(block->frame);
+    delete[] slots;
     slots = new slot_t[num_keys];
     db_get_slots(block->frame, slots, num_keys);
     i = 0;
@@ -171,12 +183,62 @@ int db_scan(int64_t table_id,
 
 // Initialize the database system.
 int init_db(int num_buf) {
-  return buf_init_db(num_buf);
+  if (init_lock_table() || buf_init_db(num_buf)) {
+    return -1;
+  }
+  return 0;
 }
 
 // Shutdown the database system.
 int shutdown_db() {
   return buf_shutdown_db();
+}
+
+int db_update(int64_t table_id,
+              int64_t key,
+              char* value,
+              uint16_t new_val_size,
+              uint16_t* old_val_size,
+              int trx_id) {
+  control_block_t* header_block = buf_read_page(table_id, 0);
+  pagenum_t root = db_get_root_page_number(header_block->frame);
+  pagenum_t leaf = db_find_leaf(table_id, root, key);
+  buf_unpin_block(header_block, 0);
+
+  lock_t* lock = lock_acquire(table_id, leaf, key, trx_id, EXCLUSIVE);
+  if (lock == NULL) {
+    trx_abort(trx_id);
+    return -1;
+  }
+
+  control_block_t* leaf_block = buf_read_page(table_id, leaf);
+  int32_t num_keys = db_get_number_of_keys(leaf_block->frame);
+  slot_t* slots = new slot_t[num_keys];
+  db_get_slots(leaf_block->frame, slots, num_keys);
+
+  int32_t i;
+  for (i = 0; i < num_keys; i++) {
+    if (slots[i].key == key) {
+      break;
+    }
+  }
+
+  char old_val[MAX_VAL_SIZE];
+  db_get_value(old_val, leaf_block->frame, slots[i].size, slots[i].offset);
+  if (old_val_size != NULL) {
+    *old_val_size = slots[i].size;
+  }
+
+  trx_log_undo(trx_id, table_id, leaf, old_val, slots[i].size, slots[i].offset);
+
+  slots[i].size = new_val_size;
+  db_set_value(leaf_block->frame, value, slots[i].size, slots[i].offset);
+
+  buf_unpin_block(leaf_block, 0);
+
+  delete[] slots;
+
+  return 0;
 }
 
 // Getters and setters.
@@ -1188,10 +1250,10 @@ int db_delete_entry(int64_t table_id,
     }
   }
 
-  control_block_t* parent_block = buf_read_page(table_id, parent);
-
   int32_t neighbor_index = db_get_neighbor_index(table_id, page_num);
   int32_t k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
+
+  control_block_t* parent_block = buf_read_page(table_id, parent);
   int64_t k_prime = db_get_key(parent_block->frame, k_prime_index);
 
   pagenum_t neighbor =

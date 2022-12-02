@@ -1,6 +1,7 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
+#include <pthread.h>
 #include <string.h>
 #include <unordered_map>
 
@@ -13,7 +14,7 @@ struct control_block_t {
   int64_t table_id;
   pagenum_t page_num;
   int is_dirty;
-  int is_pinned;
+  pthread_mutex_t page_latch;
   control_block_t* next;
   control_block_t* prev;
 };
@@ -26,6 +27,7 @@ struct page_hash_t {
 // GLOBALS.
 
 extern std::unordered_map<page_hash_t, control_block_t*> control_block_table;
+extern pthread_mutex_t buffer_manager_latch;
 
 extern control_block_t* head_block;
 extern control_block_t* tail_block;
@@ -53,10 +55,10 @@ void buf_unpin_block(control_block_t* block, int is_dirty);
 
 // Utilities.
 
-control_block_t* buf_find_block(int64_t table_id, pagenum_t page_num);
 control_block_t* buf_find_victim();
 void buf_refer_block(control_block_t* block);
 void buf_make_block_empty(control_block_t* block);
+control_block_t* buf_make_new_block();
 
 // Getters and Setters.
 

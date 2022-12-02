@@ -23,7 +23,7 @@ int64_t table_id;
 std::string pathname = "db_test.db";
 
 int64_t n = 100000;
-int num_buf = n;
+int num_buf = n / 25;
 int max_num_length = std::to_string(n - 1).length();
 
 std::string fixed_size_value(int i) {
@@ -78,10 +78,8 @@ TEST(DbTest_FixedSizeLinearOrder, Deletion) {
 }
 
 TEST(DbTest_FixedSizeLinearOrder, CheckDeletion) {
-  char ret_val[MAX_VAL_SIZE];
-  uint16_t val_size;
   for (int64_t i = 0; i < n; i++) {
-    EXPECT_NE(db_find(table_id, i, ret_val, &val_size), 0);
+    EXPECT_NE(db_find(table_id, i, NULL, NULL), 0);
   }
 }
 
@@ -175,10 +173,8 @@ TEST(DbTest_RandomSizeRandomOrder, Deletion) {
 }
 
 TEST(DbTest_RandomSizeRandomOrder, CheckDeletion) {
-  char ret_val[MAX_VAL_SIZE];
-  uint16_t val_size;
   for (int64_t i = 0; i < n; i++) {
-    EXPECT_NE(db_find(table_id, i, ret_val, &val_size), 0);
+    EXPECT_NE(db_find(table_id, i, NULL, NULL), 0);
   }
 }
 
