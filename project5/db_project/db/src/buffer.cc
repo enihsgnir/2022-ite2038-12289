@@ -37,7 +37,6 @@ int buf_init_db(int num_buf) {
   buffer_manager_latch = PTHREAD_MUTEX_INITIALIZER;
 
   head_block = buf_make_new_block();
-  head_block->prev = NULL;
 
   control_block_t* temp = head_block;
   for (int i = 1; i < num_buf; i++) {
@@ -48,7 +47,6 @@ int buf_init_db(int num_buf) {
   }
 
   tail_block = temp;
-  tail_block->next = NULL;
 
   return 0;
 }
@@ -76,16 +74,14 @@ int buf_shutdown_db() {
 pagenum_t buf_alloc_page(int64_t table_id) {
   pthread_mutex_lock(&buffer_manager_latch);
 
+  pagenum_t first;
+
   control_block_t* header_block = control_block_table[{table_id, 0}];
   if (header_block == NULL) {
-    pthread_mutex_unlock(&buffer_manager_latch);
-    return file_alloc_page(table_id);
-  }
+    first = file_alloc_page(table_id);
+  } else {
+    pthread_mutex_lock(&header_block->page_latch);
 
-  pthread_mutex_lock(&header_block->page_latch);
-
-  pagenum_t first = buf_get_first_free_page_number(header_block->frame);
-  if (first == 0) {
     if (header_block->is_dirty) {
       file_write_page(table_id, 0, header_block->frame);
       header_block->is_dirty = 0;
@@ -93,22 +89,11 @@ pagenum_t buf_alloc_page(int64_t table_id) {
 
     first = file_alloc_page(table_id);
     file_read_page(table_id, 0, header_block->frame);
+
     buf_refer_block(header_block);
 
     pthread_mutex_unlock(&header_block->page_latch);
-    pthread_mutex_unlock(&buffer_manager_latch);
-    return first;
   }
-
-  page_t free_page;
-  file_read_page(table_id, first, &free_page);
-
-  pagenum_t next = buf_get_next_free_page_number(&free_page);
-  buf_set_first_free_page_number(header_block->frame, next);
-  header_block->is_dirty = 1;
-  buf_refer_block(header_block);
-
-  pthread_mutex_unlock(&header_block->page_latch);
 
   pthread_mutex_unlock(&buffer_manager_latch);
   return first;
@@ -126,21 +111,21 @@ void buf_free_page(int64_t table_id, pagenum_t page_num) {
   control_block_t* header_block = control_block_table[{table_id, 0}];
   if (header_block == NULL) {
     file_free_page(table_id, page_num);
-    pthread_mutex_unlock(&buffer_manager_latch);
-    return;
+  } else {
+    pthread_mutex_lock(&header_block->page_latch);
+
+    if (header_block->is_dirty) {
+      file_write_page(table_id, 0, header_block->frame);
+      header_block->is_dirty = 0;
+    }
+
+    file_free_page(table_id, page_num);
+    file_read_page(table_id, 0, header_block->frame);
+
+    buf_refer_block(header_block);
+
+    pthread_mutex_unlock(&header_block->page_latch);
   }
-
-  pthread_mutex_lock(&header_block->page_latch);
-
-  pagenum_t first = buf_get_first_free_page_number(header_block->frame);
-  buf_set_first_free_page_number(header_block->frame, page_num);
-  header_block->is_dirty = 1;
-
-  page_t free_page;
-  buf_set_next_free_page_number(&free_page, first);
-  file_write_page(table_id, page_num, &free_page);
-
-  pthread_mutex_unlock(&header_block->page_latch);
 
   pthread_mutex_unlock(&buffer_manager_latch);
 }
@@ -153,9 +138,9 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
     block = buf_find_victim();
     if (block == NULL) {
       block = buf_make_new_block();
-      file_read_page(table_id, page_num, block->frame);
-      pthread_mutex_unlock(&buffer_manager_latch);
-      return block;
+      head_block->prev = block;
+      block->next = head_block;
+      head_block = block;
     }
 
     if (block->is_dirty) {
@@ -172,21 +157,13 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
 
   buf_refer_block(block);
 
-  pthread_mutex_unlock(&buffer_manager_latch);
-
   pthread_mutex_lock(&block->page_latch);
+
+  pthread_mutex_unlock(&buffer_manager_latch);
   return block;
 }
 
 void buf_unpin_block(control_block_t* block, int is_dirty) {
-  if (is_dirty &&
-      control_block_table[{block->table_id, block->page_num}] == NULL) {
-    file_write_page(block->table_id, block->page_num, block->frame);
-    delete block->frame;
-    delete block;
-    return;
-  }
-
   block->is_dirty |= is_dirty;
   pthread_mutex_unlock(&block->page_latch);
 }
@@ -249,31 +226,11 @@ void buf_make_block_empty(control_block_t* block) {
 control_block_t* buf_make_new_block() {
   control_block_t* block = new control_block_t;
   block->frame = new page_t;
-  block->table_id = 0;
+  block->table_id = -1;
   block->page_num = 0;
   block->is_dirty = 0;
   block->page_latch = PTHREAD_MUTEX_INITIALIZER;
+  block->next = NULL;
+  block->prev = NULL;
   return block;
-}
-
-// Getter and Setter.
-
-pagenum_t buf_get_first_free_page_number(const page_t* header) {
-  pagenum_t first;
-  memcpy(&first, (uint8_t*)header + 8, 8);
-  return first;
-}
-
-void buf_set_first_free_page_number(page_t* header, const pagenum_t first) {
-  memcpy((uint8_t*)header + 8, &first, 8);
-}
-
-pagenum_t buf_get_next_free_page_number(const page_t* page) {
-  pagenum_t next;
-  memcpy(&next, page, 8);
-  return next;
-}
-
-void buf_set_next_free_page_number(page_t* page, const pagenum_t next) {
-  memcpy(page, &next, 8);
 }

@@ -202,8 +202,9 @@ int db_update(int64_t table_id,
               int trx_id) {
   control_block_t* header_block = buf_read_page(table_id, 0);
   pagenum_t root = db_get_root_page_number(header_block->frame);
-  pagenum_t leaf = db_find_leaf(table_id, root, key);
   buf_unpin_block(header_block, 0);
+
+  pagenum_t leaf = db_find_leaf(table_id, root, key);
 
   lock_t* lock = lock_acquire(table_id, leaf, key, trx_id, EXCLUSIVE);
   if (lock == NULL) {
@@ -234,7 +235,7 @@ int db_update(int64_t table_id,
   slots[i].size = new_val_size;
   db_set_value(leaf_block->frame, value, slots[i].size, slots[i].offset);
 
-  buf_unpin_block(leaf_block, 0);
+  buf_unpin_block(leaf_block, 1);
 
   delete[] slots;
 

@@ -172,11 +172,15 @@ int lock_release(lock_t* lock_obj) {
 }
 
 void trx_abort(int trx_id) {
+  pthread_mutex_lock(&trx_table_latch);
+
   trx_t* trx = trx_table[trx_id];
   std::vector<trx_undo_log_t> logs = trx->undo_logs;
   for (auto it = logs.rbegin(); it != logs.rend(); it++) {
     trx_undo_update(*it);
   }
+
+  pthread_mutex_unlock(&trx_table_latch);
 
   trx_commit(trx_id);
 }

@@ -60,12 +60,4 @@ void buf_refer_block(control_block_t* block);
 void buf_make_block_empty(control_block_t* block);
 control_block_t* buf_make_new_block();
 
-// Getters and Setters.
-
-pagenum_t buf_get_first_free_page_number(const page_t* header);
-void buf_set_first_free_page_number(page_t* header, const pagenum_t first);
-
-pagenum_t buf_get_next_free_page_number(const page_t* page);
-void buf_set_next_free_page_number(page_t* page, const pagenum_t next);
-
 #endif  // BUFFER_H_
