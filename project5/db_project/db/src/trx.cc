@@ -64,23 +64,20 @@ int trx_commit(int trx_id) {
   pthread_mutex_lock(&trx_table_latch);
 
   trx_t* trx = trx_table[trx_id];
-  if (trx == NULL) {
-    pthread_mutex_unlock(&trx_table_latch);
-    return 0;
-  }
+  if (trx != NULL) {
+    lock_t* temp = trx->lock;
+    while (temp != NULL) {
+      lock_t* next = temp->trx_next;
+      lock_release(temp);
+      temp = next;
+    }
 
-  lock_t* temp = trx->lock;
-  while (temp != NULL) {
-    lock_t* next = temp->trx_next;
-    lock_release(temp);
-    temp = next;
+    trx_table.erase(trx_id);
+    for (auto log : trx->undo_logs) {
+      delete[] log.old_val;
+    }
+    delete trx;
   }
-
-  trx_table.erase(trx_id);
-  for (auto log : trx->undo_logs) {
-    delete[] log.old_val;
-  }
-  delete trx;
 
   pthread_mutex_unlock(&trx_table_latch);
   return trx_id;
