@@ -186,11 +186,22 @@ void trx_abort(int trx_id) {
     for (auto it = logs.rbegin(); it != logs.rend(); it++) {
       trx_undo_update(*it);
     }
+
+    lock_t* temp = trx->lock;
+    while (temp != NULL) {
+      lock_t* next = temp->trx_next;
+      lock_release(temp);
+      temp = next;
+    }
+
+    trx_table.erase(trx_id);
+    for (auto log : trx->undo_logs) {
+      delete[] log.old_val;
+    }
+    delete trx;
   }
 
   pthread_mutex_unlock(&trx_table_latch);
-
-  trx_commit(trx_id);
 }
 
 // Utilities.
