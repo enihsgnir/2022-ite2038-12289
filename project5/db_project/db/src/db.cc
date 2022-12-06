@@ -205,6 +205,9 @@ int db_update(int64_t table_id,
   buf_unpin_block(header_block, 0);
 
   pagenum_t leaf = db_find_leaf(table_id, root, key);
+  if (leaf == 0) {
+    return -1;
+  }
 
   lock_t* lock = lock_acquire(table_id, leaf, key, trx_id, EXCLUSIVE);
   if (lock == NULL) {
@@ -222,6 +225,11 @@ int db_update(int64_t table_id,
     if (slots[i].key == key) {
       break;
     }
+  }
+  if (i == num_keys) {
+    buf_unpin_block(leaf_block, 0);
+    delete[] slots;
+    return -1;
   }
 
   char old_val[MAX_VAL_SIZE];
