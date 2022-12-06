@@ -64,19 +64,20 @@ int trx_commit(int trx_id) {
   pthread_mutex_lock(&trx_table_latch);
 
   trx_t* trx = trx_table[trx_id];
+  if (trx != NULL) {
+    lock_t* temp = trx->lock;
+    while (temp != NULL) {
+      lock_t* next = temp->trx_next;
+      lock_release(temp);
+      temp = next;
+    }
 
-  lock_t* temp = trx->lock;
-  while (temp != NULL) {
-    lock_t* next = temp->trx_next;
-    lock_release(temp);
-    temp = next;
+    trx_table.erase(trx_id);
+    for (auto log : trx->undo_logs) {
+      delete[] log.old_val;
+    }
+    delete trx;
   }
-
-  trx_table.erase(trx_id);
-  for (auto log : trx->undo_logs) {
-    delete[] log.old_val;
-  }
-  delete trx;
 
   pthread_mutex_unlock(&trx_table_latch);
   return trx_id;
@@ -175,9 +176,11 @@ void trx_abort(int trx_id) {
   pthread_mutex_lock(&trx_table_latch);
 
   trx_t* trx = trx_table[trx_id];
-  std::vector<trx_undo_log_t> logs = trx->undo_logs;
-  for (auto it = logs.rbegin(); it != logs.rend(); it++) {
-    trx_undo_update(*it);
+  if (trx != NULL) {
+    std::vector<trx_undo_log_t> logs = trx->undo_logs;
+    for (auto it = logs.rbegin(); it != logs.rend(); it++) {
+      trx_undo_update(*it);
+    }
   }
 
   pthread_mutex_unlock(&trx_table_latch);
@@ -189,15 +192,16 @@ void trx_abort(int trx_id) {
 
 void trx_add_lock(int trx_id, lock_t* lock) {
   trx_t* trx = trx_table[trx_id];
-
-  lock_t* temp = trx->lock;
-  if (temp == NULL) {
-    trx->lock = lock;
-  } else {
-    while (temp->trx_next != NULL) {
-      temp = temp->trx_next;
+  if (trx != NULL) {
+    lock_t* temp = trx->lock;
+    if (temp == NULL) {
+      trx->lock = lock;
+    } else {
+      while (temp->trx_next != NULL) {
+        temp = temp->trx_next;
+      }
+      temp->trx_next = lock;
     }
-    temp->trx_next = lock;
   }
 }
 
@@ -247,12 +251,14 @@ int trx_detect_deadlock(lock_t* lock) {
     }
 
     trx_t* trx = trx_table[trx_id];
-    lock_t* temp = trx->lock;
-    while (temp != NULL) {
-      for (int id : lock_waiting_list(temp)) {
-        st.push(id);
+    if (trx != NULL) {
+      lock_t* temp = trx->lock;
+      while (temp != NULL) {
+        for (int id : lock_waiting_list(temp)) {
+          st.push(id);
+        }
+        temp = temp->trx_next;
       }
-      temp = temp->trx_next;
     }
 
     checked.insert(trx_id);
@@ -289,16 +295,17 @@ void trx_log_undo(int trx_id,
                   uint16_t val_size,
                   uint16_t offset) {
   trx_t* trx = trx_table[trx_id];
+  if (trx != NULL) {
+    trx_undo_log_t log;
+    log.table_id = table_id;
+    log.page_id = page_id;
+    log.val_size = val_size;
+    log.offset = offset;
 
-  trx_undo_log_t log;
-  log.table_id = table_id;
-  log.page_id = page_id;
-  log.val_size = val_size;
-  log.offset = offset;
+    char* val = new char[val_size];
+    memcpy(val, old_val, val_size);
+    log.old_val = val;
 
-  char* val = new char[val_size];
-  memcpy(val, old_val, val_size);
-  log.old_val = val;
-
-  trx->undo_logs.push_back(log);
+    trx->undo_logs.push_back(log);
+  }
 }
