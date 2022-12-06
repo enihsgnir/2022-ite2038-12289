@@ -94,6 +94,13 @@ lock_t* lock_acquire(int64_t table_id,
                      int64_t key,
                      int trx_id,
                      int lock_mode) {
+  pthread_mutex_lock(&trx_table_latch);
+
+  if (trx_table[trx_id] == NULL) {
+    pthread_mutex_unlock(&trx_table_latch);
+    return NULL;
+  }
+
   pthread_mutex_lock(&lock_table_latch);
 
   lock_table_entry_t* entry = lock_table[{table_id, page_id}];
@@ -125,8 +132,6 @@ lock_t* lock_acquire(int64_t table_id,
   entry->tail = lock;
 
   pthread_mutex_unlock(&lock_table_latch);
-
-  pthread_mutex_lock(&trx_table_latch);
 
   trx_add_lock(trx_id, lock);
 
