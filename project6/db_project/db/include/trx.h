@@ -13,10 +13,32 @@
 
 // TYPES.
 
-struct trx_t;
-struct trx_undo_log_t;
 struct lock_t;
-struct lock_table_entry_t;
+struct page_hash_t;
+
+struct trx_t {
+  int trx_id;
+  lock_t* lock;
+  int64_t last_lsn;
+};
+
+struct lock_table_entry_t {
+  int64_t table_id;
+  pagenum_t page_id;
+  lock_t* tail;
+  lock_t* head;
+};
+
+struct lock_t {
+  lock_t* prev;
+  lock_t* next;
+  lock_table_entry_t* sentinel;
+  pthread_cond_t cond_var;
+  int64_t record_id;
+  int lock_mode;
+  lock_t* trx_next;
+  int trx_id;
+};
 
 // GLOBALS.
 
@@ -41,7 +63,11 @@ lock_t* lock_acquire(int64_t table_id,
                      int lock_mode);
 int lock_release(lock_t* lock_obj);
 
-void trx_abort(int trx_id);
+int trx_shutdown_db();
+
+int trx_abort(int trx_id);
+
+void trx_resurrect(int trx_id, int64_t last_lsn);
 
 // Utilities.
 
@@ -50,12 +76,5 @@ int lock_need_to_wait(lock_t* lock);
 void lock_wake_up_all_behind(lock_t* lock);
 int trx_detect_deadlock(lock_t* lock);
 std::set<int> lock_waiting_list(lock_t* lock);
-void trx_undo_update(trx_undo_log_t log);
-void trx_log_undo(int trx_id,
-                  int64_t table_id,
-                  pagenum_t page_id,
-                  char* old_val,
-                  uint16_t val_size,
-                  uint16_t offset);
 
 #endif /* __TRX_H__ */

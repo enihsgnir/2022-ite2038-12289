@@ -3,9 +3,9 @@
 
 #include <pthread.h>
 #include <string.h>
-#include <unordered_map>
 
 #include "file.h"
+#include "log.h"
 
 // TYPES.
 

@@ -54,6 +54,8 @@ int buf_init_db(int num_buf) {
 int buf_shutdown_db() {
   control_block_table.clear();
 
+  log_flush();
+
   control_block_t* temp = head_block;
   while (temp != NULL) {
     if (temp->is_dirty) {
@@ -65,6 +67,8 @@ int buf_shutdown_db() {
     delete temp;
     temp = next;
   }
+  head_block = NULL;
+  tail_block = NULL;
 
   file_close_table_files();
 
@@ -83,6 +87,7 @@ pagenum_t buf_alloc_page(int64_t table_id) {
     pthread_mutex_lock(&header_block->page_latch);
 
     if (header_block->is_dirty) {
+      log_flush();
       file_write_page(table_id, 0, header_block->frame);
       header_block->is_dirty = 0;
     }
@@ -115,6 +120,7 @@ void buf_free_page(int64_t table_id, pagenum_t page_num) {
     pthread_mutex_lock(&header_block->page_latch);
 
     if (header_block->is_dirty) {
+      log_flush();
       file_write_page(table_id, 0, header_block->frame);
       header_block->is_dirty = 0;
     }
@@ -144,6 +150,7 @@ control_block_t* buf_read_page(int64_t table_id, pagenum_t page_num) {
     }
 
     if (block->is_dirty) {
+      log_flush();
       file_write_page(block->table_id, block->page_num, block->frame);
       block->is_dirty = 0;
     }

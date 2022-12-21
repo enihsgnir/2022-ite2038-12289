@@ -182,16 +182,18 @@ int db_scan(int64_t table_id,
 }
 
 // Initialize the database system.
-int init_db(int num_buf) {
-  if (init_lock_table() || buf_init_db(num_buf)) {
-    return -1;
-  }
-  return 0;
+int init_db(int num_buf,
+            int flag,
+            int log_num,
+            char* log_path,
+            char* logmsg_path) {
+  return shutdown_db() || buf_init_db(num_buf) || init_lock_table() ||
+         log_init_db(log_path) || log_recover(flag, log_num, logmsg_path);
 }
 
 // Shutdown the database system.
 int shutdown_db() {
-  return buf_shutdown_db();
+  return log_shutdown_db() || trx_shutdown_db() || buf_shutdown_db();
 }
 
 int db_update(int64_t table_id,
@@ -238,10 +240,16 @@ int db_update(int64_t table_id,
     *old_val_size = slots[i].size;
   }
 
-  trx_log_undo(trx_id, table_id, leaf, old_val, slots[i].size, slots[i].offset);
-
   slots[i].size = new_val_size;
   db_set_value(leaf_block->frame, value, slots[i].size, slots[i].offset);
+
+  log_t* log = log_make_update_log(trx_id, table_id, leaf, slots[i].offset,
+                                   slots[i].size, old_val, value);
+  int64_t lsn = log_get_lsn(log);
+
+  log_add(log);
+
+  log_set_page_lsn(leaf_block->frame, lsn);
 
   buf_unpin_block(leaf_block, 1);
 
@@ -258,14 +266,14 @@ void db_get_data(void* dest,
                  const page_t* src,
                  uint16_t size,
                  uint16_t offset) {
-  memcpy(dest, (uint8_t*)src + offset, size);
+  memcpy(dest, src->data + offset, size);
 }
 
 void db_set_data(page_t* dest,
                  const void* src,
                  uint16_t size,
                  uint16_t offset) {
-  memcpy((uint8_t*)dest + offset, src, size);
+  memcpy(dest->data + offset, src, size);
 }
 
 // Header Page.

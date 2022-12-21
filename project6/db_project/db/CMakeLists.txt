@@ -6,6 +6,7 @@ set(DB_SOURCES
   ${DB_SOURCE_DIR}/db.cc
   ${DB_SOURCE_DIR}/buffer.cc
   ${DB_SOURCE_DIR}/trx.cc
+  ${DB_SOURCE_DIR}/log.cc
   # Add your sources here
   # ${DB_SOURCE_DIR}/foo/bar/your_source.cc
   )
@@ -18,6 +19,7 @@ set(DB_HEADERS
   ${DB_HEADER_DIR}/db.h
   ${DB_HEADER_DIR}/buffer.h
   ${DB_HEADER_DIR}/trx.h
+  ${DB_HEADER_DIR}/log.h
   # Add your headers here
   # ${DB_HEADER_DIR}/foo/bar/your_header.h
   )

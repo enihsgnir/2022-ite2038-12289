@@ -53,7 +53,11 @@ int db_scan(int64_t table_id,
             std::vector<uint16_t>* val_sizes);
 
 // Initialize the database system.
-int init_db(int num_buf);
+int init_db(int num_buf,
+            int flag,
+            int log_num,
+            char* log_path,
+            char* logmsg_path);
 
 // Shutdown the database system.
 int shutdown_db();

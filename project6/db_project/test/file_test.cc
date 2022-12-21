@@ -17,14 +17,15 @@
  * 2. Check if the file's initial size is 10 MiB
  */
 TEST(FileInitTest, HandlesInitialization) {
-  int64_t fd;                             // file descriptor
-  std::string pathname = "init_test.db";  // customize it to your test file
+  int fd;                          // file descriptor
+  std::string pathname = "DATA1";  // customize it to your test file
+  int64_t table_id;
 
   // Open a database file
-  fd = file_open_table_file(pathname.c_str());
+  table_id = file_open_table_file(pathname.c_str());
 
   // Check if the file is opened
-  ASSERT_TRUE(fd >= 0);  // change the condition to your design's behavior
+  ASSERT_TRUE(table_id >= 0);  // change the condition to your design's behavior
 
   // Check the size of the initial file
   int num_pages = /* fetch the number of pages from the header page */ 2560;
@@ -52,18 +53,21 @@ class FileTest : public ::testing::Test {
    * perferred due to some reasons. Checkout the document for the difference
    */
   FileTest() {
-    pathname = "file_test.db";
-    fd = file_open_table_file(pathname.c_str());
+    pathname = "DATA1";
+    table_id = file_open_table_file(pathname.c_str());
+    fd = file_find_fd(table_id);
   }
 
   ~FileTest() {
     if (fd >= 0) {
       file_close_table_files();
+      remove(pathname.c_str());
     }
   }
 
-  int64_t fd;            // file descriptor
+  int fd;                // file descriptor
   std::string pathname;  // path for the file
+  int64_t table_id;
 };
 
 /*
@@ -75,11 +79,11 @@ TEST_F(FileTest, HandlesPageAllocation) {
   pagenum_t allocated_page, freed_page;
 
   // Allocate the pages
-  allocated_page = file_alloc_page(fd);
-  freed_page = file_alloc_page(fd);
+  allocated_page = file_alloc_page(table_id);
+  freed_page = file_alloc_page(table_id);
 
   // Free one page
-  file_free_page(fd, freed_page);
+  file_free_page(table_id, freed_page);
 
   // Traverse the free page list and check the existence of the freed/allocated
   // pages. You might need to open a few APIs soley for testing.
@@ -87,8 +91,7 @@ TEST_F(FileTest, HandlesPageAllocation) {
   bool allocated_page_exists = false;
   bool freed_page_exists = false;
 
-  pagenum_t next;
-  pread(fd, &next, 8, 8);
+  pagenum_t next = file_read_first_free_page_number(fd);
   while (next > 0) {
     if (next == allocated_page) {
       allocated_page_exists = true;
@@ -97,8 +100,7 @@ TEST_F(FileTest, HandlesPageAllocation) {
       freed_page_exists = true;
     }
 
-    pagenum_t temp = next;
-    pread(fd, &next, 8, temp * PAGE_SIZE);
+    next = file_read_next_free_page_number(fd, next);
   }
 
   ASSERT_FALSE(allocated_page_exists);
@@ -110,18 +112,17 @@ TEST_F(FileTest, HandlesPageAllocation) {
  * 1. Write/Read a page with some random content and check if the data matches
  */
 TEST_F(FileTest, CheckReadWriteOperation) {
-  struct page_t* src = (struct page_t*)malloc(PAGE_SIZE);
+  page_t* src = new page_t;
   memset(src, 'a', PAGE_SIZE);
 
-  pagenum_t pagenum = file_alloc_page(fd);
+  pagenum_t pagenum = file_alloc_page(table_id);
 
-  file_write_page(fd, pagenum, src);
+  file_write_page(table_id, pagenum, src);
 
-  struct page_t* dest = (struct page_t*)malloc(PAGE_SIZE);
-  file_read_page(fd, pagenum, dest);
+  page_t* dest = new page_t;
+  file_read_page(table_id, pagenum, dest);
 
   EXPECT_EQ(memcmp(src, dest, PAGE_SIZE), 0);
 
-  free(src);
-  free(dest);
+  delete src, dest;
 }

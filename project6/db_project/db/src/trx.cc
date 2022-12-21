@@ -1,39 +1,5 @@
 #include "trx.h"
 
-// TYPES.
-
-struct trx_t {
-  int trx_id;
-  lock_t* lock;
-  std::vector<trx_undo_log_t> undo_logs;
-};
-
-struct trx_undo_log_t {
-  int64_t table_id;
-  pagenum_t page_id;
-  char* old_val;
-  uint16_t val_size;
-  uint16_t offset;
-};
-
-struct lock_t {
-  lock_t* prev;
-  lock_t* next;
-  lock_table_entry_t* sentinel;
-  pthread_cond_t cond_var;
-  int64_t record_id;
-  int lock_mode;
-  lock_t* trx_next;
-  int trx_id;
-};
-
-struct lock_table_entry_t {
-  int64_t table_id;
-  pagenum_t page_id;
-  lock_t* tail;
-  lock_t* head;
-};
-
 // GLOBALS.
 
 int g_trx_id = 1;
@@ -54,7 +20,11 @@ int trx_begin() {
   int trx_id = g_trx_id++;
   trx->trx_id = trx_id;
   trx->lock = NULL;
+  trx->last_lsn = -1;
   trx_table[trx->trx_id] = trx;
+
+  log_t* log = log_make_base_log(trx_id, BEGIN);
+  log_add(log);
 
   pthread_mutex_unlock(&trx_table_latch);
   return trx_id;
@@ -72,10 +42,10 @@ int trx_commit(int trx_id) {
       temp = next;
     }
 
+    log_t* log = log_make_base_log(trx_id, COMMIT);
+    log_add_and_flush(log);
+
     trx_table.erase(trx_id);
-    for (auto log : trx->undo_logs) {
-      delete[] log.old_val;
-    }
     delete trx;
   }
 
@@ -177,14 +147,24 @@ int lock_release(lock_t* lock_obj) {
   return 0;
 }
 
-void trx_abort(int trx_id) {
+int trx_shutdown_db() {
+  trx_table.clear();
+  lock_table.clear();
+  return 0;
+}
+
+int trx_abort(int trx_id) {
   pthread_mutex_lock(&trx_table_latch);
 
   trx_t* trx = trx_table[trx_id];
   if (trx != NULL) {
-    std::vector<trx_undo_log_t> logs = trx->undo_logs;
-    for (auto it = logs.rbegin(); it != logs.rend(); it++) {
-      trx_undo_update(*it);
+    std::vector<log_t*> logs = log_trace(trx->last_lsn);
+    for (log_t* log : logs) {
+      if (log_get_type(log) == UPDATE) {
+        log_undo(log);
+      }
+      delete[] log->data;
+      delete log;
     }
 
     lock_t* temp = trx->lock;
@@ -194,12 +174,23 @@ void trx_abort(int trx_id) {
       temp = next;
     }
 
+    log_t* log = log_make_base_log(trx_id, ROLLBACK);
+    log_add_and_flush(log);
+
     trx_table.erase(trx_id);
-    for (auto log : trx->undo_logs) {
-      delete[] log.old_val;
-    }
     delete trx;
   }
+
+  pthread_mutex_unlock(&trx_table_latch);
+  return trx_id;
+}
+
+void trx_resurrect(int trx_id, int64_t last_lsn) {
+  pthread_mutex_lock(&trx_table_latch);
+
+  trx_t* trx = new trx_t;
+  trx->last_lsn = last_lsn;
+  trx_table[trx_id] = trx;
 
   pthread_mutex_unlock(&trx_table_latch);
 }
@@ -296,32 +287,4 @@ std::set<int> lock_waiting_list(lock_t* lock) {
     temp = temp->prev;
   }
   return trx_ids;
-}
-
-void trx_undo_update(trx_undo_log_t log) {
-  control_block_t* block = buf_read_page(log.table_id, log.page_id);
-  memcpy((uint8_t*)block->frame + log.offset, log.old_val, log.val_size);
-  buf_unpin_block(block, 1);
-}
-
-void trx_log_undo(int trx_id,
-                  int64_t table_id,
-                  pagenum_t page_id,
-                  char* old_val,
-                  uint16_t val_size,
-                  uint16_t offset) {
-  trx_t* trx = trx_table[trx_id];
-  if (trx != NULL) {
-    trx_undo_log_t log;
-    log.table_id = table_id;
-    log.page_id = page_id;
-    log.val_size = val_size;
-    log.offset = offset;
-
-    char* val = new char[val_size];
-    memcpy(val, old_val, val_size);
-    log.old_val = val;
-
-    trx->undo_logs.push_back(log);
-  }
 }
