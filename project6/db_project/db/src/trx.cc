@@ -148,8 +148,27 @@ int lock_release(lock_t* lock_obj) {
 }
 
 int trx_shutdown_db() {
+  std::vector<int> trx_ids;
+  for (auto i : trx_table) {
+    trx_ids.push_back(i.first);
+  }
+  for (int trx_id : trx_ids) {
+    trx_abort(trx_id);
+  }
   trx_table.clear();
+
+  for (auto i : lock_table) {
+    lock_table_entry_t* entry = i.second;
+    lock_t* temp = entry->head;
+    while (temp != NULL) {
+      lock_t* next = temp->next;
+      delete temp;
+      temp = next;
+    }
+    delete entry;
+  }
   lock_table.clear();
+
   return 0;
 }
 

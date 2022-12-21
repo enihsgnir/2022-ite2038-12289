@@ -1,7 +1,5 @@
 #include "log.h"
 
-#include <iostream>
-
 // GLOBALS.
 
 int log_fd;
@@ -283,13 +281,14 @@ int log_init_db(char* log_path) {
       return -1;
     }
   }
+
   return 0;
 }
 
 int log_shutdown_db() {
-  close(log_fd);
   g_lsn = 0;
-  log_buffer.clear();
+  log_flush();
+  close(log_fd);
   return 0;
 }
 
@@ -412,6 +411,7 @@ void log_undo(log_t* log) {
 
   log_t* compensate_log = log_make_compensate_log(log);
   int64_t lsn = log_get_lsn(compensate_log);
+
   log_add(compensate_log);
 
   log_set_page_lsn(block->frame, lsn);

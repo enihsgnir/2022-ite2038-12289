@@ -1,7 +1,5 @@
 #include "file.h"
 
-#include <stdlib.h>
-
 std::unordered_map<int64_t, int> fd_table;
 
 // Open existing database file or create one if it doesn't exist

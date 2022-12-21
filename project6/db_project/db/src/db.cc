@@ -193,7 +193,7 @@ int init_db(int num_buf,
 
 // Shutdown the database system.
 int shutdown_db() {
-  return log_shutdown_db() || trx_shutdown_db() || buf_shutdown_db();
+  return trx_shutdown_db() || buf_shutdown_db() || log_shutdown_db();
 }
 
 int db_update(int64_t table_id,
